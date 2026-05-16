@@ -1,9 +1,23 @@
-﻿$HOME_GATEWAY    = ""
-$EXPECTED_DNS    = ""
-$TAILSCALE_EXE   = "C:\Path\To\tailscale.exe"
+﻿$HOME_GATEWAY  = ""
+$EXPECTED_DNS  = ""
+# These are the default install paths for Tailscale on Windows; adjust if you installed it somewhere else.
+$TAILSCALE_EXE = "C:\Program Files\Tailscale\tailscale.exe"
+$TAILSCALE_IPN = "C:\Program Files\Tailscale\tailscale-ipn.exe"
+$COOLDOWN_FILE = "C:\Scripts\tailscale-last-run.tmp"
+$COOLDOWN_SECS = 30
 
-$tsStatus = & $TAILSCALE_EXE status 2>&1
-if ($tsStatus -notmatch "stopped") {
+# Cooldown — if last run was less than 30s ago, exit immediately
+if (Test-Path $COOLDOWN_FILE) {
+    $lastRun = (Get-Item $COOLDOWN_FILE).LastWriteTime
+    if ((New-TimeSpan -Start $lastRun -End (Get-Date)).TotalSeconds -lt $COOLDOWN_SECS) {
+        exit 0
+    }
+}
+Set-Content $COOLDOWN_FILE -Value (Get-Date) -ErrorAction SilentlyContinue
+
+# If Tailscale is already connected, exit immediately
+$tsStatus = (& $TAILSCALE_EXE status 2>&1) -join "`n"
+if ($tsStatus -notmatch "stopped" -and $tsStatus -notmatch "NoState") {
     exit 0
 }
 
@@ -46,21 +60,31 @@ if ($homeRoute) {
 Write-Host "External network — starting Tailscale..." -ForegroundColor Yellow
 
 try {
-    # Get physical interface name
-    $physicalInterface = Get-NetAdapter -InterfaceIndex $activeGateway.InterfaceIndex | Select-Object -ExpandProperty Name
-
     Start-Service -Name "Tailscale" -ErrorAction Stop
     & $TAILSCALE_EXE up 2>&1 | Out-Null
 
-    # Set Tailscale interface metric to highest priority
-    & netsh interface ip set interface "Tailscale" metric=1 2>&1 | Out-Null
+    # Metric swap — gives Tailscale routing priority over the active physical interface.
+    # This prevents VPNs like GlobalProtect (PANGP Virtual Ethernet Adapter) from
+    # hijacking DNS and traffic by holding a lower metric than Tailscale.
+    # Tailscale is set to (current metric - 1) so it takes priority without
+    # touching other interfaces or risking metric conflicts.
+    $activeInterface = (Get-NetAdapter -InterfaceIndex $activeGateway.InterfaceIndex).Name
+    $currentMetric = (Get-NetIPInterface -InterfaceIndex $activeGateway.InterfaceIndex -AddressFamily IPv4).InterfaceMetric
+    $tailscaleMetric = $currentMetric - 1
+    Write-Host "Setting metrics: Tailscale=$tailscaleMetric, $activeInterface=$currentMetric (unchanged)" -ForegroundColor Gray
+    & "C:\Windows\System32\netsh.exe" interface ip set interface "Tailscale" metric=$tailscaleMetric | Out-Null
 
-    # Lower priority of physical interface
-    & netsh interface ip set interface "$physicalInterface" metric=5 2>&1 | Out-Null
+    # Launch GUI only if not already running.
+    # Using Start-Job so tailscale-ipn.exe has no parent console to attach to.
+    $ipnRunning = Get-Process -Name "tailscale-ipn" -ErrorAction SilentlyContinue
+    if (-not $ipnRunning) {
+        $ipn = $TAILSCALE_IPN
+        Start-Job -ScriptBlock { Start-Process $using:ipn } | Out-Null
+    }
 
-    Start-Process "C:\Program Files\Tailscale\tailscale-ipn.exe"
     Write-Host "Tailscale started." -ForegroundColor Green
     Start-Sleep -Seconds 2
+    exit 0
 } catch {
     Show-Error "Failed to start Tailscale.`n$($_.Exception.Message)"
 }
