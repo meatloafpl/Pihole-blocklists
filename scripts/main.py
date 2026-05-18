@@ -99,11 +99,10 @@ def get_root(domain: str) -> str:
 # Subdomain filtering
 
 def filter_subdomains(domains: set[str]) -> set[str]:
-    roots = {get_root(d) for d in domains}
     filtered = set()
     for d in domains:
         root = get_root(d)
-        if d == root or root not in roots:
+        if d == root or root not in domains:  # ← domains, nie roots
             filtered.add(d)
     return filtered
 
