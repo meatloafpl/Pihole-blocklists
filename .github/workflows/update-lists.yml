@@ -1,0 +1,41 @@
+name: Update Lists
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 0"   # każda niedziela o 3:00 UTC
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests tldextract pytest
+
+      - name: Run tests
+        working-directory: scripts
+        run: pytest test_main.py -v
+
+      - name: Generate oisd-unique
+        working-directory: scripts
+        run: python main.py
+
+      - name: Commit updated lists
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add captured oisd-unique
+          git diff --cached --quiet || git commit -m "chore: update lists [skip ci]"
+          git push
