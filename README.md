@@ -71,8 +71,10 @@ If you use different base filters, you can modify `EXISTING_LISTS` in
 
 1. **Copy raw URLs** for the lists you want:
 
-https://raw.githubusercontent.com/YOUR_USERNAME/Moto-PIhole-domain-list/main/captured
-https://raw.githubusercontent.com/YOUR_USERNAME/Moto-PIhole-domain-list/main/oisd-unique
+```
+https://raw.githubusercontent.com/meatloafpl/Pihole-blocklists/main/captured
+https://raw.githubusercontent.com/meatloafpl/Pihole-blocklists/main/oisd-unique
+```
 
 2. **Add to Pi-hole:**
    - Go to **Pi-hole Admin Panel** → **Adlists**
@@ -81,13 +83,13 @@ https://raw.githubusercontent.com/YOUR_USERNAME/Moto-PIhole-domain-list/main/ois
 
 3. **Update gravity:**
 ```bash
-   pihole -g
+pihole -g
 ```
 
 4. **(Optional)** Set up a cron job to auto-update:
 ```bash
-   # Update every Sunday at 3 AM
-   0 3 * * 0 pihole -g
+# Update every Sunday at 3 AM
+0 3 * * 0 pihole -g
 ```
 
 ---
@@ -139,96 +141,6 @@ cd scripts/
 python main.py
 ```
 
-**Example output:**
-============================================================
-Fetching existing lists...
-[hosts]
-(cached 0h ago)
-->  82,208 domains
-[pro.plus.txt]
-(cached 0h ago)
--> 562,598 domains
-[hostfile.txt]
-(cached 0h ago)
-->   1,007 domains
-[captured] (local)
-->       0 domains
-TOTAL: 624,162 unique domains
-Fetching OISD Big...
-(fetched fresh)
--> 401,699 domains in OISD Big
-Computing diff...
-Raw unique domains: 296,095
-After removing covered subdomains: 203,255
-After removing internal subdomains: 183,687
-OISD coverage by your lists: 26.3%
-New domains to add: 183,687
-Saving...
-/oisd-unique -> /path/to/oisd-unique (183,687 domains)
-Done!
----
-
-### `tailscale-conditional-start.ps1` — Network Detection
-
-Automatically starts Tailscale VPN when connecting to networks other than 
-your home network (Windows).
-
-**What it does:**
-
-1. **Checks if Tailscale is already running** — exits if active
-
-2. **Waits for DHCP** to assign network configuration
-
-3. **Detects the active default gateway:**
-   - If it matches `$HOME_GATEWAY` → verifies DNS points to Pi-hole
-   - If it's a different network → starts Tailscale
-
-4. **Starts Tailscale service:**
-   - Runs `tailscale up`
-   - Sets Tailscale interface metric to 1 (highest priority)
-   - Automatically adjusts physical adapter metric to 5
-   - Launches Tailscale GUI
-
-**Configuration:**
-
-Edit the script and set your values:
-```powershell
-$HOME_GATEWAY    = "192.168.1.1"           # Your home router IP
-$EXPECTED_DNS    = "192.168.1.2"           # Your Pi-hole IP
-$TAILSCALE_EXE   = "C:\Program Files\Tailscale\tailscale.exe"
-```
-
-**Installation:**
-
-1. **Set up Task Scheduler to run on network connection:**
-   
-   - Open **Task Scheduler** → **Create Task**
-   - **General tab:**
-     - Name: `Tailscale Auto-Start`
-     - ☑ Run with highest privileges
-   
-   - **Triggers tab:**
-     - New → **On an event**
-     - Log: `Microsoft-Windows-NetworkProfile/Operational`
-     - Source: `NetworkProfile`
-     - Event ID: `10000`
-   
-   - **Actions tab:**
-     - New → **Start a program**
-     - Program: `powershell.exe`
-     - Arguments: `-ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Path\To\tailscale-conditional-start.ps1"`
-   
-   - **Conditions tab:**
-     - ☐ Uncheck "Start the task only if the computer is on AC power"
-
-2. **Test by connecting to a different Wi-Fi network**
-
-**Safety features:**
-- Shows error popup if home network detected but Pi-hole DNS is missing
-- Uses fallback DNS check to prevent misdetection
-- Non-destructive — only starts Tailscale when needed
-- Automatic interface detection (no hardcoded adapter names)
-
 ---
 
 ## 📦 Installation
@@ -241,26 +153,26 @@ Just add the raw URLs to your Pi-hole adlists — no installation needed.
 
 1. **Clone the repository:**
 ```bash
-   git clone https://github.com/YOUR_USERNAME/Moto-PIhole-domain-list.git
-   cd Moto-PIhole-domain-list
+git clone https://github.com/meatloafpl/Pihole-blocklists.git
+cd Pihole-blocklists
 ```
 
 2. **Install Python dependencies:**
 ```bash
-   pip install requests tldextract
+pip install requests tldextract
 ```
 
 3. **Run the generator:**
 ```bash
-   cd scripts/
-   python main.py
+cd scripts/
+python main.py
 ```
 
 4. **Commit and push changes:**
 ```bash
-   git add captured oisd-unique
-   git commit -m "Update lists"
-   git push
+git add captured oisd-unique
+git commit -m "Update lists"
+git push
 ```
 
 ---
