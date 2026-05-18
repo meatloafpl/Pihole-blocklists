@@ -3,6 +3,11 @@
 A supplementary blocklist collection for Pi-hole, built from real traffic 
 analysis and intelligent OISD Big database filtering.
 
+> ⚠️ **This is not a standalone blocklist.**  
+> It is a delta layer designed for users already running multiple major filters
+> (StevenBlack, HaGeZi, OISD). Adding it without a strong baseline provides
+> little value and may increase false positives.
+
 This repository provides two curated blocklists that extend popular filters 
 without duplication:
 
@@ -21,7 +26,7 @@ Each domain has been manually reviewed and verified to be related to
 
 **Source:** Real-world network analysis  
 **Update frequency:** Manual updates as new domains are discovered  
-**Current count:** ~0-50 domains (maintained minimal to avoid overlap)
+**Current count:** ~82 domains (maintained minimal to avoid overlap)
 
 ### `oisd-unique`
 
@@ -96,12 +101,11 @@ pihole -g
 
 ## 🛠️ Tools
 
-Scripts used to generate and maintain these lists are located in the `scripts/` 
-directory.
+Scripts used to generate and maintain these lists are located in the `scripts/` directory.
 
 ### `main.py` — Domain List Generator
 
-Analyzes existing blocklists, fetches OISD Big, removes duplicates and covered 
+Analyzes existing blocklists, fetches OISD Big, removes duplicates and covered
 subdomains, then generates the `oisd-unique` list.
 
 **What it does:**
@@ -117,10 +121,10 @@ subdomains, then generates the `oisd-unique` list.
 3. **Computes the diff:**
    - Removes domains already covered by base filters
    - Removes subdomains if their root domain is already blocked
-   - Filters out internal subdomain redundancy (e.g., keeps `example.com` 
+   - Filters out internal subdomain redundancy (e.g., keeps `example.com`
      instead of both `sub.example.com` and `example.com`)
 
-4. **Cleans the `captured` list** by removing domains already covered by 
+4. **Cleans the `captured` list** by removing domains already covered by
    other filters
 
 5. **Saves `oisd-unique`** with ~180k–200k new domains
@@ -141,6 +145,46 @@ cd scripts/
 python main.py
 ```
 
+---
+
+### `check_captured.py` — Dead Domain Checker
+
+Resolves all domains in `captured` concurrently and reports their DNS status.
+Useful for periodic manual cleanup before pushing changes.
+
+**Statuses:**
+- `OK` — domain resolves normally
+- `TIMEOUT` — no response from authoritative server; does not mean the domain is dead, review manually
+- `NXDOMAIN` — domain does not exist and should be removed from `captured`
+
+**Usage:**
+```bash
+cd scripts/
+python check_captured.py
+```
+
+No dependencies beyond the standard library.
+
+---
+
+### `test_main.py` — Unit Tests
+
+Pytest test suite covering the three core functions in `main.py`:
+`extract_domains`, `get_root`, and `filter_subdomains`.
+
+Run before pushing changes to catch regressions early.
+Also executed automatically by CI on every push.
+
+**Requirements:**
+```bash
+pip install pytest tldextract
+```
+
+**Usage:**
+```bash
+cd scripts/
+pytest test_main.py -v
+```
 ---
 
 ## 📦 Installation
@@ -171,7 +215,7 @@ python main.py
 4. **Commit and push changes:**
 ```bash
 git add captured oisd-unique
-git commit -m "Update lists"
+git commit -m ":zap: update lists"
 git push
 ```
 
@@ -185,7 +229,7 @@ git push
 | OISD Big | ~402k | — |
 | OISD overlap with base | ~218k | 54.2% |
 | **oisd-unique (new)** | **~184k** | **45.8%** |
-| captured | ~0-50 | Manual |
+| captured | ~82 | Manual |
 
 *Stats based on latest generation run*
 
@@ -241,6 +285,22 @@ please open an issue with:
 - Domain name
 - Category (tracking/ads/marketing)
 - How you discovered it (which site/app triggered it)
+
+### Commit convention
+
+This repository uses [gitmoji](https://gitmoji.dev) with lowercase messages:
+
+| Emoji | Use case |
+|-------|----------|
+| `:zap:` | update lists |
+| `:bug:` | fix incorrect behavior |
+| `:construction_worker:` | ci/cd changes |
+| `:white_check_mark:` | add or update tests |
+| `:memo:` | documentation changes |
+| `:fire:` | remove files or code |
+| `:sparkles:` | new feature |
+
+Example: `:bug: fix subdomain filtering when root domain is absent`
 
 ---
 
