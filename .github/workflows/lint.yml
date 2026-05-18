@@ -25,3 +25,22 @@ jobs:
       - name: Run tests
         working-directory: scripts
         run: pytest test_main.py -v
+
+      - name: Check captured for dead domains
+        run: |
+          echo "Checking DNS resolution for domains in captured..."
+          dead=0
+          while IFS= read -r domain || [[ -n "$domain" ]]; do
+            [[ -z "$domain" || "$domain" == \#* ]] && continue
+            if ! host "$domain" 1.1.1.1 > /dev/null 2>&1; then
+              echo "NXDOMAIN: $domain"
+              dead=$((dead + 1))
+            fi
+          done < captured
+          if [ "$dead" -gt 0 ]; then
+            echo ""
+            echo "⚠️  $dead dead domain(s) found in captured."
+            echo "Review and remove them to keep the list clean."
+            exit 1
+          fi
+          echo "All domains resolved successfully."
