@@ -2,6 +2,7 @@ abtest-aws-us-east-01.saas.sensorsdata.com
 accel.renderbetter.com
 afs.ampaeservices.com
 an.gr-wcon.com
+api.okendo.io
 api.privacy-center.org
 api.renderbetter.dev
 api.snrapi.com
@@ -14,8 +15,10 @@ atlas.taboolanews.com
 b1.nel.goog
 bi.im-g.pl
 cached.rebuyengine.com
+cdn-static.okendo.io
 cdn.equalweb.com
 cdn.hextom.com
+cdn.ketchjs.com
 cdn.onnetwork.tv
 cdn.raspaid.pl
 cdn.rebuyengine.com
@@ -28,8 +31,10 @@ dcsaascdn.net
 decathlonpl.app.baqend.com
 depict-search.apps.depict.ai
 dns-tunnel-check.googlezip.net
+endpoint2.archonph.com
 epss.alibaba-inc.com
 geo.rebuyengine.com
+global.ketchcdn.com
 gpms.sesupdate.com
 graph.fbpigeon.com
 growthbook.operacdn.com
@@ -62,6 +67,7 @@ sf-ssp.tiktokcdn-eu.com
 snippet.maze.co
 static.im-g.pl
 surveys-static-prd.survicate-cdn.com
+surveys.okendo.io
 survicate-cdn.com
 tfile.xiaoman.cn
 tm.erli.pl
