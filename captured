@@ -4,6 +4,7 @@ afs.ampaeservices.com
 an.gr-wcon.com
 api-promo.samsungknowledge.com
 api.appcues.net
+api.gx.me
 api.luigisbox.tech
 api.okendo.io
 api.privacy-center.org
@@ -23,6 +24,7 @@ b1.nel.goog
 bi.im-g.pl
 browser.samsungcloudcdn.com
 cached.rebuyengine.com
+cashback-api-production.operacdn.com
 ccp.greenhousegroup.com
 cdn-static.okendo.io
 cdn.equalweb.com
@@ -45,9 +47,11 @@ decathlonpl.app.baqend.com
 depict-search.apps.depict.ai
 developer.opineo.pl
 dns-tunnel-check.googlezip.net
+doofinder.com
 endpoint2.archonph.com
 epss.alibaba-inc.com
 eu.app.unleash-hosted.com
+event-tracker.justjoin.it
 files.smartsuppcdn.com
 forms.freshmail.io
 fp.aion.be
@@ -62,6 +66,7 @@ hiyaapi.com
 hpdaas.com
 iai.trustmate.io
 infakt.user.com
+insights-hive.com
 integrations.etrusted.com
 library.startquestion.com
 libs.ipresso.pl
@@ -72,6 +77,7 @@ ma.erli.pl
 mailing.skalnik.pl
 media-esky-pl.ipresso.pl
 mobile-data.onetrust.io
+mods.store.gx.me
 mr.ebilet.pl
 multimedia.mailing.skalnik.pl
 n-104-1.cdn.redgalaxy.com
@@ -98,6 +104,7 @@ scs-config-use2.bixbyllm.com
 scs-euw1.bixbyllm.com
 sdk.privacy-center.org
 sf-ssp.tiktokcdn-eu.com
+sibforms.com
 snippet.maze.co
 stati.pl
 static.im-g.pl
@@ -107,6 +114,7 @@ surveys.okendo.io
 survicate-cdn.com
 tfile.xiaoman.cn
 tm.erli.pl
+tracker.justjoin.it
 tracookiepixel.xyz
 translations.smartsuppcdn.com
 trustmate.io
