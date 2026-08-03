@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 CAPTURED_PATH = ROOT_DIR / "captured"
 EXISTING_LISTS = [
     "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-    "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/pro.plus.txt",
+    "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.plus.txt",  # było: main/domains/pro.plus.txt
     "https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/master/polish-pihole-filters/hostfile.txt",
     CAPTURED_PATH,
 ]
