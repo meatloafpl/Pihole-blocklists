@@ -29,18 +29,31 @@ jobs:
       - name: Check captured for dead domains
         run: |
           echo "Checking DNS resolution for domains in captured..."
-          dead=0
+          nxdomain=0
+          unresolved=0
+
           while IFS= read -r domain || [[ -n "$domain" ]]; do
             [[ -z "$domain" || "$domain" == \#* ]] && continue
-            if ! host "$domain" 1.1.1.1 > /dev/null 2>&1; then
-              echo "NXDOMAIN: $domain"
-              dead=$((dead + 1))
+
+            output=$(host "$domain" 1.1.1.1 2>&1)
+
+            if echo "$output" | grep -q "3(NXDOMAIN)"; then
+              echo "::warning::NXDOMAIN (likely dead): $domain"
+              nxdomain=$((nxdomain + 1))
+            elif ! echo "$output" | grep -q "has address\|has IPv6 address\|is an alias"; then
+              # SERVFAIL, timeout, or any other non-conclusive result.
+              # This does NOT mean the domain is dead — see check_captured.py
+              # for why TIMEOUT is treated separately from NXDOMAIN.
+              echo "::warning::unresolved, needs manual review (not necessarily dead): $domain"
+              unresolved=$((unresolved + 1))
             fi
           done < captured
-          if [ "$dead" -gt 0 ]; then
-            echo ""
-            echo "⚠️  $dead dead domain(s) found in captured."
-            echo "Review and remove them to keep the list clean."
-            exit 1
+
+          echo ""
+          echo "Summary: $nxdomain confirmed NXDOMAIN, $unresolved unresolved (review manually)."
+          if [ "$nxdomain" -gt 0 ]; then
+            echo "Run 'python scripts/check_captured.py' locally to confirm and clean up."
           fi
-          echo "All domains resolved successfully."
+          # Informational only — never fails the build. A single DNS query from
+          # a CI runner is not reliable enough to gate merges on; false positives
+          # from transient network issues or resolver throttling are common.
