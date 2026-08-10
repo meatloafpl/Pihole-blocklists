@@ -1,4 +1,6 @@
-from main import extract_domains, get_root, filter_subdomains
+from unittest.mock import patch, Mock
+import requests
+from main import extract_domains, get_root, filter_subdomains, fetch, fetch_with_fallback, protect_infrastructure
 
 # extract_domains
 
@@ -121,3 +123,233 @@ class TestFilterSubdomains:
     def test_mixed_tlds(self):
         domains = {"example.co.uk", "sub.example.co.uk", "other.com"}
         assert filter_subdomains(domains) == {"example.co.uk", "other.com"}
+
+
+# fetch / fetch_with_fallback
+#
+# CACHE_DIR is monkeypatched to a per-test tmp_path so tests never touch
+# the real .cache directory and never depend on network state.
+
+def _mock_response(text):
+    resp = Mock()
+    resp.text = text
+    resp.raise_for_status = Mock()
+    return resp
+
+
+def _mock_failure():
+    resp = Mock()
+    resp.raise_for_status = Mock(side_effect=requests.HTTPError("404 Client Error"))
+    return resp
+
+
+class TestFetch:
+
+    def test_fetch_returns_fresh_content_on_success(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        with patch("main.requests.get", return_value=_mock_response("example.com")):
+            assert fetch("https://example.com/list.txt") == "example.com"
+
+    def test_fetch_allow_stale_false_returns_empty_on_failure_no_cache(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        with patch("main.requests.get", return_value=_mock_failure()):
+            assert fetch("https://example.com/list.txt", allow_stale=False) == ""
+
+    def test_fetch_allow_stale_true_returns_stale_cache_on_failure(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        url = "https://example.com/list.txt"
+
+        # Seed a stale cache entry by succeeding once, then backdating cached_at.
+        with patch("main.requests.get", return_value=_mock_response("stale-content")):
+            fetch(url)
+
+        import json
+        import hashlib
+        from datetime import datetime, timedelta
+        key = hashlib.md5(url.encode()).hexdigest()
+        meta_path = tmp_path / f"{key}.meta.json"
+        old_time = datetime.now() - timedelta(hours=999)
+        meta_path.write_text(json.dumps({"cached_at": old_time.isoformat()}))
+
+        with patch("main.requests.get", return_value=_mock_failure()):
+            assert fetch(url, allow_stale=True) == "stale-content"
+
+    def test_fetch_allow_stale_false_ignores_stale_cache_on_failure(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        url = "https://example.com/list.txt"
+
+        with patch("main.requests.get", return_value=_mock_response("stale-content")):
+            fetch(url)
+
+        import json
+        import hashlib
+        from datetime import datetime, timedelta
+        key = hashlib.md5(url.encode()).hexdigest()
+        meta_path = tmp_path / f"{key}.meta.json"
+        old_time = datetime.now() - timedelta(hours=999)
+        meta_path.write_text(json.dumps({"cached_at": old_time.isoformat()}))
+
+        with patch("main.requests.get", return_value=_mock_failure()):
+            assert fetch(url, allow_stale=False) == ""
+
+
+class TestFetchWithFallback:
+
+    def test_uses_primary_when_it_succeeds(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        with patch("main.requests.get", return_value=_mock_response("primary-content")):
+            result = fetch_with_fallback(
+                "https://primary.example/list.txt",
+                "https://fallback.example/list.txt",
+            )
+        assert result == "primary-content"
+
+    def test_falls_back_when_primary_fails(self, tmp_path, monkeypatch):
+        # Regression test: fetch() previously returned stale cache content
+        # on failure, which fetch_with_fallback() treated as a truthy
+        # success, so it never tried the fallback URL even when the
+        # primary genuinely failed. This must not happen again.
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+
+        def side_effect(url, **kwargs):
+            if "primary" in url:
+                return _mock_failure()
+            return _mock_response("fallback-content")
+
+        with patch("main.requests.get", side_effect=side_effect):
+            result = fetch_with_fallback(
+                "https://primary.example/list.txt",
+                "https://fallback.example/list.txt",
+            )
+        assert result == "fallback-content"
+
+    def test_falls_back_ignores_stale_cache_of_failed_primary(self, tmp_path, monkeypatch):
+        # Even if the primary URL has a stale cache from a previous run,
+        # a fresh failure must still trigger the fallback, not silently
+        # return the old cached content.
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        primary = "https://primary.example/list.txt"
+        fallback = "https://fallback.example/list.txt"
+
+        with patch("main.requests.get", return_value=_mock_response("old-primary-content")):
+            fetch(primary)
+
+        import json
+        import hashlib
+        from datetime import datetime, timedelta
+        key = hashlib.md5(primary.encode()).hexdigest()
+        meta_path = tmp_path / f"{key}.meta.json"
+        old_time = datetime.now() - timedelta(hours=999)
+        meta_path.write_text(json.dumps({"cached_at": old_time.isoformat()}))
+
+        def side_effect(url, **kwargs):
+            if url == primary:
+                return _mock_failure()
+            return _mock_response("fresh-fallback-content")
+
+        with patch("main.requests.get", side_effect=side_effect):
+            result = fetch_with_fallback(primary, fallback)
+
+        assert result == "fresh-fallback-content"
+
+    def test_tries_all_urls_in_order_before_giving_up(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        attempted = []
+
+        def side_effect(url, **kwargs):
+            attempted.append(url)
+            return _mock_failure()
+
+        with patch("main.requests.get", side_effect=side_effect):
+            fetch_with_fallback(
+                "https://a.example/list.txt",
+                "https://b.example/list.txt",
+                "https://c.example/list.txt",
+            )
+
+        # Each URL attempted once during the allow_stale=False pass,
+        # plus one more retry of the primary for the final stale-cache attempt.
+        assert attempted.count("https://a.example/list.txt") == 2
+        assert attempted.count("https://b.example/list.txt") == 1
+        assert attempted.count("https://c.example/list.txt") == 1
+
+    def test_returns_stale_primary_cache_when_all_sources_fail(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        primary = "https://primary.example/list.txt"
+        fallback = "https://fallback.example/list.txt"
+
+        with patch("main.requests.get", return_value=_mock_response("last-known-good")):
+            fetch(primary)
+
+        import json
+        import hashlib
+        from datetime import datetime, timedelta
+        key = hashlib.md5(primary.encode()).hexdigest()
+        meta_path = tmp_path / f"{key}.meta.json"
+        old_time = datetime.now() - timedelta(hours=999)
+        meta_path.write_text(json.dumps({"cached_at": old_time.isoformat()}))
+
+        with patch("main.requests.get", return_value=_mock_failure()):
+            result = fetch_with_fallback(primary, fallback)
+
+        assert result == "last-known-good"
+
+    def test_returns_empty_when_everything_fails_and_no_cache(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("main.CACHE_DIR", tmp_path)
+        with patch("main.requests.get", return_value=_mock_failure()):
+            result = fetch_with_fallback(
+                "https://a.example/list.txt",
+                "https://b.example/list.txt",
+            )
+        assert result == ""
+
+
+# protect_infrastructure
+#
+# This is the actual defense against a self-blocking loop: if an upstream
+# list ever includes a domain the script itself needs to fetch its own
+# sources, it must never survive into the generated output. Without this,
+# a poisoned oisd-unique/captured could brick future runs the moment it's
+# loaded back into Pi-hole.
+
+class TestProtectInfrastructure:
+
+    def test_strips_exact_infra_domain(self):
+        domains = {"raw.githubusercontent.com", "ads.example.com"}
+        result = protect_infrastructure(domains, "test")
+        assert result == {"ads.example.com"}
+
+    def test_strips_subdomain_of_infra_root(self):
+        # e.g. some-tracker.github.com should not survive either, since
+        # its root (github.com) is critical infrastructure.
+        domains = {"telemetry.github.com", "ads.example.com"}
+        result = protect_infrastructure(domains, "test")
+        assert result == {"ads.example.com"}
+
+    def test_strips_all_known_critical_domains(self):
+        domains = {
+            "github.com",
+            "raw.githubusercontent.com",
+            "cdn.jsdelivr.net",
+            "gitlab.com",
+            "big.oisd.nl",
+            "legit-ad-tracker.com",
+        }
+        result = protect_infrastructure(domains, "test")
+        assert result == {"legit-ad-tracker.com"}
+
+    def test_leaves_unrelated_domains_untouched(self):
+        domains = {"ads.example.com", "tracker.other.com"}
+        result = protect_infrastructure(domains, "test")
+        assert result == domains
+
+    def test_empty_input(self):
+        assert protect_infrastructure(set(), "test") == set()
+
+    def test_does_not_over_match_lookalike_domains(self):
+        # A domain that merely contains "github" or "oisd" as a substring
+        # must not be stripped — only exact matches or true subdomains
+        # of the protected roots.
+        domains = {"notgithub.com", "myoisd.nl", "github.com.evil.net"}
+        result = protect_infrastructure(domains, "test")
+        assert result == domains
