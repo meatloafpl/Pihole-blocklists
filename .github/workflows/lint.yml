@@ -35,7 +35,7 @@ jobs:
           while IFS= read -r domain || [[ -n "$domain" ]]; do
             [[ -z "$domain" || "$domain" == \#* ]] && continue
 
-            output=$(host "$domain" 1.1.1.1 2>&1)
+            output=$(host "$domain" 1.1.1.1 2>&1) || true
 
             if echo "$output" | grep -q "3(NXDOMAIN)"; then
               echo "::warning::NXDOMAIN (likely dead): $domain"
