@@ -38,7 +38,7 @@ jobs:
             output=$(host "$domain" 1.1.1.1 2>&1) || true
 
             if echo "$output" | grep -q "3(NXDOMAIN)"; then
-              echo "::warning::NXDOMAIN (likely dead): $domain"
+              echo "::error::NXDOMAIN (dead): $domain"
               nxdomain=$((nxdomain + 1))
             elif ! echo "$output" | grep -q "has address\|has IPv6 address\|is an alias"; then
               # SERVFAIL, timeout, or any other non-conclusive result.
@@ -51,9 +51,12 @@ jobs:
 
           echo ""
           echo "Summary: $nxdomain confirmed NXDOMAIN, $unresolved unresolved (review manually)."
-          if [ "$nxdomain" -gt 0 ]; then
-            echo "Run 'python scripts/check_captured.py' locally to confirm and clean up."
+          if [ "$unresolved" -gt 0 ]; then
+            echo "Unresolved entries are informational only — a single CI query isn't"
+            echo "conclusive (see check_captured.py). They do not fail this check."
           fi
-          # Informational only — never fails the build. A single DNS query from
-          # a CI runner is not reliable enough to gate merges on; false positives
-          # from transient network issues or resolver throttling are common.
+          if [ "$nxdomain" -gt 0 ]; then
+            echo "::error::$nxdomain domain(s) in captured are confirmed dead (NXDOMAIN)."
+            echo "Run 'python scripts/check_captured.py' locally to confirm and clean up, then push a fix."
+            exit 1
+          fi
