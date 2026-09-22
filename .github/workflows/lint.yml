@@ -38,8 +38,17 @@ jobs:
             output=$(host "$domain" 1.1.1.1 2>&1) || true
 
             if echo "$output" | grep -q "3(NXDOMAIN)"; then
-              echo "::error::NXDOMAIN (dead): $domain"
-              nxdomain=$((nxdomain + 1))
+              # Confirm on a second, independent resolver before treating as dead —
+              # a single resolver's NXDOMAIN can be network-dependent (see incident
+              # where 1.1.1.1-from-CI disagreed with a local check).
+              output2=$(host "$domain" 8.8.8.8 2>&1) || true
+              if echo "$output2" | grep -q "3(NXDOMAIN)"; then
+                echo "::error::NXDOMAIN on 1.1.1.1 and 8.8.8.8 (dead): $domain"
+                nxdomain=$((nxdomain + 1))
+              else
+                echo "::warning::NXDOMAIN on 1.1.1.1 but not confirmed on 8.8.8.8, needs manual review: $domain"
+                unresolved=$((unresolved + 1))
+              fi
             elif ! echo "$output" | grep -q "has address\|has IPv6 address\|is an alias"; then
               # SERVFAIL, timeout, or any other non-conclusive result.
               # This does NOT mean the domain is dead — see check_captured.py
@@ -50,13 +59,12 @@ jobs:
           done < captured
 
           echo ""
-          echo "Summary: $nxdomain confirmed NXDOMAIN, $unresolved unresolved (review manually)."
+          echo "Summary: $nxdomain confirmed NXDOMAIN (2 resolvers agree), $unresolved unresolved (review manually)."
           if [ "$unresolved" -gt 0 ]; then
-            echo "Unresolved entries are informational only — a single CI query isn't"
-            echo "conclusive (see check_captured.py). They do not fail this check."
+            echo "Unresolved entries are informational only — do not fail this check."
           fi
           if [ "$nxdomain" -gt 0 ]; then
-            echo "::error::$nxdomain domain(s) in captured are confirmed dead (NXDOMAIN)."
+            echo "::error::$nxdomain domain(s) in captured are confirmed dead (NXDOMAIN on both 1.1.1.1 and 8.8.8.8)."
             echo "Run 'python scripts/check_captured.py' locally to confirm and clean up, then push a fix."
             exit 1
           fi
