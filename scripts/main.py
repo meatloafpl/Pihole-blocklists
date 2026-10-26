@@ -144,12 +144,34 @@ def filter_subdomains(domains: set[str]) -> set[str]:
     return filtered
 
 
+def is_covered(domain: str, blocked: set[str]) -> bool:
+    """True if `domain` itself or any of its parent domains is in `blocked`.
+
+    A blocked parent also blocks all its subdomains in Pi-hole, so such an
+    entry is redundant. A *sibling* (another subdomain of the same root)
+    being blocked says nothing about `domain`, so it does not count.
+    """
+    parts = domain.split('.')
+    return any('.'.join(parts[i:]) in blocked for i in range(len(parts) - 1))
+
+
+def clean_captured(captured: set[str], base: set[str]) -> tuple[set[str], set[str]]:
+    """Split `captured` into (kept, covered) against the base filter lists.
+
+    `base` must NOT include the captured list itself, otherwise exact
+    duplicates would count as their own coverage evidence.
+    """
+    covered = {d for d in captured if is_covered(d, base)}
+    return captured - covered, covered
+
+
 def main():
     print("=" * 60)
     print("Fetching existing lists...")
     print("=" * 60)
 
     existing_domains: set[str] = set()
+    base_domains: set[str] = set()      # all lists except `captured`
     captured_domains: set[str] = set()
 
     for entry in EXISTING_LISTS:
@@ -173,19 +195,14 @@ def main():
 
         if isinstance(entry, Path) and entry.name == "captured":
             captured_domains = parsed
+        else:
+            base_domains.update(parsed)
 
     print(f"\n TOTAL: {len(existing_domains):,} unique domains\n")
 
     existing_roots = {get_root(d) for d in existing_domains}
 
-    existing_without_captured = existing_domains - captured_domains
-    existing_without_captured_roots = {get_root(d) for d in existing_without_captured}
-
-    captured_covered = {
-        d for d in captured_domains
-        if get_root(d) in existing_without_captured_roots
-    }
-    captured_cleaned = captured_domains - captured_covered
+    captured_cleaned, captured_covered = clean_captured(captured_domains, base_domains)
     captured_cleaned = protect_infrastructure(captured_cleaned, "captured")
 
     print("=" * 60)

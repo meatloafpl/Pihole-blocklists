@@ -1,6 +1,6 @@
 from unittest.mock import patch, Mock
 import requests
-from main import extract_domains, get_root, filter_subdomains, fetch, fetch_with_fallback, protect_infrastructure
+from main import extract_domains, get_root, filter_subdomains, fetch, fetch_with_fallback, protect_infrastructure, is_covered, clean_captured
 
 # extract_domains
 
@@ -353,3 +353,61 @@ class TestProtectInfrastructure:
         domains = {"notgithub.com", "myoisd.nl", "github.com.evil.net"}
         result = protect_infrastructure(domains, "test")
         assert result == domains
+
+
+# is_covered / clean_captured
+
+class TestIsCovered:
+
+    def test_exact_match(self):
+        assert is_covered("ads.example.com", {"ads.example.com"})
+
+    def test_parent_domain_covers_subdomain(self):
+        assert is_covered("a.b.example.com", {"example.com"})
+        assert is_covered("a.b.example.com", {"b.example.com"})
+
+    def test_sibling_does_not_cover(self):
+        # Regression: another subdomain of the same root must not count.
+        assert not is_covered("cdn.uppromote.com", {"pixel.uppromote.com"})
+
+    def test_child_does_not_cover_parent(self):
+        assert not is_covered("example.com", {"ads.example.com"})
+
+    def test_unrelated(self):
+        assert not is_covered("example.com", {"other.org"})
+
+    def test_bare_tld_is_never_a_parent(self):
+        assert not is_covered("example.com", {"com"})
+
+    def test_multi_label_suffix(self):
+        assert is_covered("x.shop.example.co.uk", {"example.co.uk"})
+        assert not is_covered("x.example.co.uk", {"y.example.co.uk"})
+
+
+class TestCleanCaptured:
+
+    def test_keeps_entry_when_only_sibling_is_in_base(self):
+        # Regression: used to be dropped because the *root* appeared in base.
+        kept, covered = clean_captured(
+            {"cdn.uppromote.com", "arc.msn.com"},
+            {"pixel.uppromote.com", "a.ads1.msn.com"},
+        )
+        assert kept == {"cdn.uppromote.com", "arc.msn.com"}
+        assert covered == set()
+
+    def test_removes_exact_duplicate_of_base_entry(self):
+        # Regression: used to be kept because captured was subtracted from
+        # the evidence set before the check.
+        kept, covered = clean_captured({"dc-telemetry.net", "new.example.org"},
+                                       {"dc-telemetry.net"})
+        assert covered == {"dc-telemetry.net"}
+        assert kept == {"new.example.org"}
+
+    def test_removes_entry_under_blocked_parent(self):
+        kept, covered = clean_captured({"sub.tracker.com"}, {"tracker.com"})
+        assert covered == {"sub.tracker.com"}
+        assert kept == set()
+
+    def test_empty_inputs(self):
+        assert clean_captured(set(), {"a.com"}) == (set(), set())
+        assert clean_captured({"a.com"}, set()) == ({"a.com"}, set())
