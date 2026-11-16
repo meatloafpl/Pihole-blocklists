@@ -11,6 +11,7 @@ api.appcues.net
 api.gx.me
 api.luigisbox.tech
 api.mambasms.com
+api.manago.ai
 api.nfcube.com
 api.okendo.io
 api.privacy-center.org
@@ -39,12 +40,14 @@ cashback-api-production.operacdn.com
 ccp.greenhousegroup.com
 cdn-static.okendo.io
 cdn.equalweb.com
+cdn.evgnet.com
 cdn.growthbook.io
 cdn.hextom.com
 cdn.ketchjs.com
 cdn.luigisbox.tech
 cdn.onnetwork.tv
 cdn.proxi.cloud
+cdn.pushpushgo.com
 cdn.raspaid.pl
 cdn.rebuyengine.com
 cdn.sender.net
@@ -54,7 +57,6 @@ chat.askspot.io
 cmp.ringpublishing.com
 connect.facebook.net
 core.helloretail.com
-cs.loudecho.ai
 d-art.ppstatic.pl
 d-pa.ppstatic.pl
 dcsaascdn.net
@@ -68,6 +70,7 @@ endpoint2.archonph.com
 epss.alibaba-inc.com
 eu.app.unleash-hosted.com
 event-tracker.justjoin.it
+events.voidinteractive.io
 files.smartsuppcdn.com
 fp.aion.be
 ftp.stati.pl
@@ -94,7 +97,7 @@ instafeed.nfcube.com
 integrations.etrusted.com
 js.klarna.com
 js.trustisto.com
-libra32-normal-no1a.tiktokv.eu
+lg1.prefixbox.com
 library.startquestion.com
 libs.ipresso.pl
 live.luigisbox.tech
@@ -115,6 +118,7 @@ oec-im-tt-i18n.tiktokglobalshopv.com
 optimeeze.data.adeo.cloud
 p13n.adobe.io
 perun.ipresso.pl
+policy.system-usage-report.intel.com
 procdn.swymrelay.com
 prompts.maze.co
 proxy.snrbox.com
@@ -140,7 +144,6 @@ sdk.privacy-center.org
 service1.us.incognia.com
 service2.us.incognia.com
 service4.us.incognia.com
-sf-ssp.tiktokcdn-eu.com
 sn-api.military.pl
 snippet.maze.co
 stackdiscounts-api.deals.today
@@ -157,6 +160,7 @@ swymv3pro-01.azureedge.net
 tfile.xiaoman.cn
 tm.erli.pl
 tracker.justjoin.it
+tracking.militaria.pl
 translations.smartsuppcdn.com
 trustmate.io
 tw.erli.pl
